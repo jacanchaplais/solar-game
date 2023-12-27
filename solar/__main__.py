@@ -6,28 +6,22 @@ import functools as fn
 import operator as op
 import sys
 import random
+import itertools as it
+import typing as ty
+import contextlib as ctx
 
 import pygame
 
 from . import CONST, COLOR, SIM, load_conf
 
 
+T = ty.TypeVar("T")
+
 TIMESTEP = CONST["SECONDS_PER_DAY"] * SIM["days_per_timestep"]
 SOLAR_MASS = CONST["SOLAR_MASS"]
 GRAV_CONST = CONST["GRAV_CONST"]
 AU = CONST["AU"]
 COLOR_WHITE = COLOR["white"]
-
-pygame.init()
-WIDTH, HEIGHT = (
-    pygame.display.Info().current_w,
-    pygame.display.Info().current_h,
-)
-HALF_WIDTH, HALF_HEIGHT = 0.5 * WIDTH, 0.5 * HEIGHT
-WINDOW = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-FONT_1 = pygame.font.SysFont("Trebuchet MS", 21)
-FONT_2 = pygame.font.SysFont("Trebuchet MS", 16)
-pygame.display.set_caption("Solar System Simulation")
 
 SCALE_PER_AU = 200.0
 
@@ -67,37 +61,6 @@ class Body:
     def y_vel(self) -> float:
         return self.vel.imag
 
-    def draw(self, window, scale, show, move_x, move_y, draw_line):
-        x = self.pos.real * scale + HALF_WIDTH
-        y = self.pos.imag * scale + HALF_HEIGHT
-        if len(self.orbit) > 2:
-            updated_points = []
-            for point in self.orbit:
-                x, y = point
-                x = x * scale + HALF_WIDTH
-                y = y * scale + HALF_HEIGHT
-                updated_points.append((x + move_x, y + move_y))
-            if draw_line:
-                pygame.draw.lines(window, self.color, False, updated_points, 1)
-        pygame.draw.circle(
-            window, self.color, (x + move_x, y + move_y), self.radius
-        )
-        if not self.sun:
-            distance_text = FONT_2.render(
-                f"{round(self.distance_to_sun * 1.057 * 10 ** -16, 8)} "
-                "light years",
-                True,
-                COLOR_WHITE,
-            )
-            if show:
-                window.blit(
-                    distance_text,
-                    (
-                        x - 0.5 * distance_text.get_width() + move_x,
-                        y - 0.5 * distance_text.get_height() - 20.0 + move_y,
-                    ),
-                )
-
     def attraction(self, other):
         displacement = other.pos - self.pos
         distance, theta = cmath.polar(displacement)
@@ -119,6 +82,19 @@ class Body:
         self.radius *= scale
 
 
+def coord_disp(
+    x: float,
+    y: float,
+    scale: float,
+    move_x: float = 0.0,
+    move_y: float = 0.0
+) -> tuple[float, float]:
+    half_width = 0.5 * pygame.display.Info().current_w
+    half_height = 0.5 * pygame.display.Info().current_h
+    return (x * scale + half_width + move_x, y * scale + half_height + move_y)
+
+
+
 def draw(
     body: Body,
     window: pygame.Surface,
@@ -128,17 +104,19 @@ def draw(
     move_y: float,
     draw_line: bool,
     display_dist: bool,
+    font: pygame.font.Font,
 ) -> None:
-    x = body.pos.real * scale + HALF_WIDTH
-    y = body.pos.imag * scale + HALF_HEIGHT
+    coord_ = fn.partial(coord_disp, scale=scale, move_x=move_x, move_y=move_y)
+    x, y = coord_(body.pos.real, body.pos.imag)
     pygame.draw.circle(
-        window, body.color, (x + move_x, y + move_y), body.radius
+        window, body.color, (x, y), body.radius
     )
+    traj = tuple(it.starmap(coord_, body.orbit))
     if draw_line and (len(body.orbit) > 2):
-        pygame.draw.lines(window, body.color, False, body.orbit, 1)
-    if not (display_dist or show):
+        pygame.draw.lines(window, body.color, False, traj, 1)
+    if not (display_dist and show):
         return
-    distance_text = FONT_2.render(
+    distance_text = font.render(
         f"{round(body.distance_to_sun * 1.057 * 10 ** -16, 8)} "
         "light years",
         True,
@@ -147,25 +125,45 @@ def draw(
     window.blit(
         distance_text,
         (
-            x - 0.5 * distance_text.get_width() + move_x,
-            y - 0.5 * distance_text.get_height() - 20.0 + move_y,
+            x - 0.5 * distance_text.get_width(),
+            y - 0.5 * distance_text.get_height() - 20.0,
         ),
     )
 
 
+class PygameContext(ctx.ContextDecorator):
+    def __enter__(self: ty.Self) -> ty.Self:
+        pygame.init()
+        pygame.display.set_caption("Solar System Simulation")
+        return self
+
+    def __exit__(self, *_) -> ty.Literal[False]:
+        pygame.quit()
+        return False
+
+
+@PygameContext()
 def main(conf) -> None:
-    print(conf)
+    # pygame program variables:
+    clock = pygame.time.Clock()
+    window = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+    font_1 = pygame.font.SysFont("Trebuchet MS", 21)
+    font_2 = pygame.font.SysFont("Trebuchet MS", 16)
+
+    # interface switches:
     run = True
     pause = False
     show_distance = False
-    clock = pygame.time.Clock()
-    move_x = 0
-    move_y = 0
     draw_line = True
 
+    # constants and units:
+    color_universe = COLOR["universe"]
     scale = SCALE_PER_AU / AU
     unit_speed = AU / CONST["SECONDS_PER_DAY"]
     solar_mass = CONST["SOLAR_MASS"]
+    scale_factors = (1.25, 0.75)
+
+    # populating and sorting the bodies from the config file:
     planets = []
     for name, props in conf["bodies"].items():
         rot_op = cmath.rect(1.0, random.uniform(0.0, math.tau))
@@ -182,16 +180,14 @@ def main(conf) -> None:
         body.pos *= rot_op
         body.vel *= rot_op
         planets.append(body)
-
     planets.sort(key=lambda b: abs(b.pos))
     sun = planets[0]
     sun.sun = True
-    scale_factors = (1.25, 0.75)
 
-    color_universe = COLOR["universe"]
+    move_x = move_y = 0.0
     while run:
         clock.tick(60)
-        WINDOW.fill(color_universe)
+        window.fill(color_universe)
 
         for event in pygame.event.get():
             event_type = event.type
@@ -233,54 +229,48 @@ def main(conf) -> None:
         if keys[pygame.K_DOWN] or mouse_y == window_h - 1:
             move_y -= distance
 
-        for planet in planets:
-            if not pause:
-                planet.update_position(planets)
-            if show_distance:
-                planet.draw(WINDOW, scale, 1, move_x, move_y, draw_line)
-            else:
-                planet.draw(WINDOW, scale, 0, move_x, move_y, draw_line)
-
-        fps_text = FONT_1.render(
-            "FPS: " + str(int(clock.get_fps())), True, COLOR_WHITE
-        )
-        WINDOW.blit(fps_text, (15, 15))
-        text_surface = FONT_1.render(
-            "Press X or ESC to exit", True, COLOR_WHITE
-        )
-        WINDOW.blit(text_surface, (15, 45))
-        text_surface = FONT_1.render(
-            "Press D to turn on/off distance", True, COLOR_WHITE
-        )
-        WINDOW.blit(text_surface, (15, 75))
-        text_surface = FONT_1.render(
-            "Press S to turn on/off drawing orbit lines", True, COLOR_WHITE
-        )
-        WINDOW.blit(text_surface, (15, 105))
-        text_surface = FONT_1.render(
-            "Use mouse or arrow keys to move around", True, COLOR_WHITE
-        )
-        WINDOW.blit(text_surface, (15, 135))
-        text_surface = FONT_1.render("Press C to center", True, COLOR_WHITE)
-        WINDOW.blit(text_surface, (15, 165))
-        text_surface = FONT_1.render(
-            "Press Space to pause/unpause", True, COLOR_WHITE
-        )
-        WINDOW.blit(text_surface, (15, 195))
-        text_surface = FONT_1.render(
-            "Use scroll-wheel to zoom", True, COLOR_WHITE
-        )
-        WINDOW.blit(text_surface, (15, 225))
-
-        for planet_num, planet in enumerate(planets):
-            planet_surface = FONT_1.render(
+        for plan_num, planet in enumerate(planets):
+            not_sol = plan_num != 0
+            draw(planet, window, scale, show_distance, move_x, move_y, draw_line, not_sol, font_2)
+            planet_surface = font_1.render(
                 f"- {planet.name.capitalize()}", True, planet.color
             )
-            WINDOW.blit(planet_surface, (15, (285 + (planet_num * 30))))
+            window.blit(planet_surface, (15, (285 + (plan_num * 30))))
+            if pause:
+                continue
+            planet.update_position(planets)
 
+        fps_text = font_1.render(
+            "FPS: " + str(int(clock.get_fps())), True, COLOR_WHITE
+        )
+        window.blit(fps_text, (15, 15))
+        text_surface = font_1.render(
+            "Press X or ESC to exit", True, COLOR_WHITE
+        )
+        window.blit(text_surface, (15, 45))
+        text_surface = font_1.render(
+            "Press D to turn on/off distance", True, COLOR_WHITE
+        )
+        window.blit(text_surface, (15, 75))
+        text_surface = font_1.render(
+            "Press S to turn on/off drawing orbit lines", True, COLOR_WHITE
+        )
+        window.blit(text_surface, (15, 105))
+        text_surface = font_1.render(
+            "Use mouse or arrow keys to move around", True, COLOR_WHITE
+        )
+        window.blit(text_surface, (15, 135))
+        text_surface = font_1.render("Press C to center", True, COLOR_WHITE)
+        window.blit(text_surface, (15, 165))
+        text_surface = font_1.render(
+            "Press Space to pause/unpause", True, COLOR_WHITE
+        )
+        window.blit(text_surface, (15, 195))
+        text_surface = font_1.render(
+            "Use scroll-wheel to zoom", True, COLOR_WHITE
+        )
+        window.blit(text_surface, (15, 225))
         pygame.display.update()
-
-    pygame.quit()
 
 
 if __name__ == "__main__":
