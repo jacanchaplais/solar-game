@@ -26,8 +26,9 @@ COLOR_WHITE = COLOR["white"]
 SCALE_PER_AU = 200.0
 
 KEY_TEXT = (
+    "Press X or ESC to exit",
     "Press D to turn on/off distance",
-    "Press S to turn on/off drawing orbit lines"
+    "Press S to turn on/off drawing orbit lines",
     "Use mouse or arrow keys to move around",
     "Press C to center",
     "Press Space to pause/unpause",
@@ -109,6 +110,7 @@ def draw(
     draw_line: bool,
     display_dist: bool,
     font: pygame.font.Font,
+    color: tuple[int, int, int] = COLOR_WHITE,
 ) -> None:
     coord_ = fn.partial(coord_disp, scale=scale, move_x=move_x, move_y=move_y)
     x, y = coord_(body.pos.real, body.pos.imag)
@@ -119,9 +121,9 @@ def draw(
     if not (display_dist and show):
         return
     distance_text = font.render(
-        f"{round(body.distance_to_sun * 1.057 * 10 ** -16, 8)} " "light years",
+        f"{round(body.distance_to_sun * 1.057 * 10 ** -16, 8)} light years",
         True,
-        COLOR_WHITE,
+        color,
     )
     window.blit(
         distance_text,
@@ -132,7 +134,7 @@ def draw(
     )
 
 
-class PygameContext(ctx.ContextDecorator):
+class GameContext(ctx.ContextDecorator):
     def __init__(self, title: str) -> None:
         self.title = title
 
@@ -146,14 +148,21 @@ class PygameContext(ctx.ContextDecorator):
         return False
 
 
-def key_message(message: str, index: int, window: pygame.Surface, font: pygame.font.Font) -> None:
+def key_message(
+    message: str,
+    index: int,
+    window: pygame.Surface,
+    font: pygame.font.Font,
+    color: tuple[int, int, int] = COLOR_WHITE,
+) -> None:
     offset = 15 + (index * 30)
-    window.blit(font.render(message, True, COLOR_WHITE), (15, offset))
+    window.blit(font.render(message, True, color), (15, offset))
 
 
-def game_loop(window: pygame.Surface, fps: int = 60):
+def game_loop(
+    window: pygame.Surface, scale: float, bodies: list[Body], fps: int = 60
+):
     clock = pygame.time.Clock()
-    font_1 = pygame.font.SysFont("Trebuchet MS", 21)
     color_universe = COLOR["universe"]
     scale_factors = (1.25, 0.75)
 
@@ -163,9 +172,11 @@ def game_loop(window: pygame.Surface, fps: int = 60):
     show_distance = False
     draw_line = True
 
-    key_key = fn.partial(key_message, window=window, font=font_1)
+    font = pygame.font.SysFont("Trebuchet MS", 21)
+    key_key = fn.partial(key_message, window=window, font=font)
 
-    # def key_message(message: str, top_offset: int, window: pygame.Surface, font: pygame.font.Font) -> None:
+    move_x = move_y = 0.0
+
     while run:
         clock.tick(fps)
         window.fill(color_universe)
@@ -190,19 +201,42 @@ def game_loop(window: pygame.Surface, fps: int = 60):
                 factor = scale_factors[event.button - 4]
             if not run:
                 break
-        yield pause, show_distance, draw_line, recentre, factor
+        if factor:
+            scale *= factor
+            for body in bodies:
+                body.update_scale(factor)
+        if recentre:
+            move_x, move_y = op.attrgetter("real", "imag")(
+                -bodies[0].pos * scale
+            )
+
+        yield pause, show_distance, draw_line, scale, (move_x, move_y)
+
+        keys = pygame.key.get_pressed()
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+        window_w, window_h = pygame.display.get_surface().get_size()
+        distance = 10
+        if keys[pygame.K_LEFT] or mouse_x == 0:
+            move_x += distance
+        if keys[pygame.K_RIGHT] or mouse_x == window_w - 1:
+            move_x -= distance
+        if keys[pygame.K_UP] or mouse_y == 0:
+            move_y += distance
+        if keys[pygame.K_DOWN] or mouse_y == window_h - 1:
+            move_y -= distance
         key_key(f"FPS: {int(clock.get_fps())}", 0)
         for idx, msg in enumerate(KEY_TEXT, start=1):
             key_key(msg, idx)
+        for idx, body in enumerate(bodies, start=(len(KEY_TEXT) + 2)):
+            key_key(f"- {body.name.capitalize()}", idx, color=body.color)
         pygame.display.update()
 
 
-@PygameContext("Solar System Simulation")
+@GameContext("Solar System Simulation")
 def main(conf: dict[str, ty.Any]) -> None:
     # pygame program variables:
     window = pygame.display.set_mode()
-    font_1 = pygame.font.SysFont("Trebuchet MS", 21)
-    font_2 = pygame.font.SysFont("Trebuchet MS", 16)
+    font = pygame.font.SysFont("Trebuchet MS", 16)
 
     # constants and units:
     scale = SCALE_PER_AU / AU
@@ -210,7 +244,7 @@ def main(conf: dict[str, ty.Any]) -> None:
     solar_mass = CONST["SOLAR_MASS"]
 
     # populating and sorting the bodies from the config file:
-    planets = []
+    bodies = []
     for name, props in conf["bodies"].items():
         rot_op = cmath.rect(1.0, random.uniform(0.0, math.tau))
         body = Body(
@@ -225,52 +259,29 @@ def main(conf: dict[str, ty.Any]) -> None:
         )
         body.pos *= rot_op
         body.vel *= rot_op
-        planets.append(body)
-    planets.sort(key=lambda b: abs(b.pos))
-    sun = planets[0]
-    sun.sun = True
+        bodies.append(body)
+    bodies.sort(key=lambda b: abs(b.pos))
+    bodies[0].sun = True
 
-    move_x = move_y = 0.0
-    for pause, show_dist, draw_line, centre, factor in game_loop(window, 100):
-        if factor:
-            scale *= factor
-            for planet in planets:
-                planet.update_scale(factor)
-        if centre:
-            move_x, move_y = op.attrgetter("real", "imag")(-sun.pos * scale)
-        keys = pygame.key.get_pressed()
-        mouse_x, mouse_y = pygame.mouse.get_pos()
-        window_w, window_h = pygame.display.get_surface().get_size()
-        distance = 10
-        if keys[pygame.K_LEFT] or mouse_x == 0:
-            move_x += distance
-        if keys[pygame.K_RIGHT] or mouse_x == window_w - 1:
-            move_x -= distance
-        if keys[pygame.K_UP] or mouse_y == 0:
-            move_y += distance
-        if keys[pygame.K_DOWN] or mouse_y == window_h - 1:
-            move_y -= distance
-
-        for plan_num, planet in enumerate(planets):
-            not_sol = plan_num != 0
+    for pause, show_dist, draw_l, scale, shift in game_loop(
+        window, scale, bodies
+    ):
+        for body_num, body in enumerate(bodies):
+            not_sun = body_num != 0
             draw(
-                planet,
+                body,
                 window,
                 scale,
                 show_dist,
-                move_x,
-                move_y,
-                draw_line,
-                not_sol,
-                font_2,
+                shift[0],
+                shift[1],
+                draw_l,
+                not_sun,
+                font,
             )
-            planet_surface = font_1.render(
-                f"- {planet.name.capitalize()}", True, planet.color
-            )
-            window.blit(planet_surface, (15, (285 + (plan_num * 30))))
             if pause:
                 continue
-            planet.update_position(planets)
+            body.update_position(bodies)
 
 
 if __name__ == "__main__":
