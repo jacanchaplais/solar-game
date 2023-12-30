@@ -27,12 +27,12 @@ SCALE_PER_AU = 200.0
 
 KEY_TEXT = (
     "Press q or ESC to exit",
-    "Press d to turn on/off distance",
-    "Press s to turn on/off drawing orbit lines",
+    "Press d to turn on / off distance",
+    "Press s to turn on / off drawing orbit lines",
     "Use hjkl or arrow keys to move around",
     "Press c to center",
-    "Press Space to pause/unpause",
-    "Use scroll-wheel to zoom",
+    "Press Space to pause / unpause",
+    "Use - / + to zoom, and 0 to reset",
 )
 
 
@@ -49,7 +49,17 @@ class Body:
         "distance_to_sun",
     )
 
-    def __init__(self, name, x, y, vel_x, vel_y, radius, color, mass):
+    def __init__(
+        self,
+        name: str,
+        x: float,
+        y: float,
+        vel_x: float,
+        vel_y: float,
+        radius: float,
+        color: tuple[int, int, int],
+        mass: float,
+    ) -> None:
         self.name = name
         self.pos = complex(x, y)
         self.vel = complex(vel_x, vel_y)
@@ -71,7 +81,7 @@ class Body:
     def y_vel(self) -> float:
         return self.vel.imag
 
-    def attraction(self, other):
+    def attraction(self, other: ty.Self) -> complex:
         displacement = other.pos - self.pos
         distance, theta = cmath.polar(displacement)
         if other.sun:
@@ -80,16 +90,16 @@ class Body:
         force = cmath.rect(force, theta)
         return force
 
-    def update_position(self, planets):
+    def update_position(self, bodies: list[ty.Self]) -> None:
         total_force = complex(0.0, 0.0)
-        for planet in filter(fn.partial(op.is_not, self), planets):
-            total_force += self.attraction(planet)
+        for body in filter(fn.partial(op.is_not, self), bodies):
+            total_force += self.attraction(body)
         self.vel += total_force * TIMESTEP / self.mass
         self.pos += self.vel * TIMESTEP
         self.orbit.append((self.pos.real, self.pos.imag))
 
-    def update_scale(self, scale):
-        self.radius *= scale
+    def update_scale(self, factor: float) -> None:
+        self.radius *= factor
 
 
 def coord_disp(
@@ -167,7 +177,7 @@ def game_loop(
 ):
     clock = pygame.time.Clock()
     color_universe = COLOR["universe"]
-    scale_factors = (1.25, 0.75)
+    scale_factors = {pygame.K_EQUALS: 1.25, pygame.K_MINUS: 0.75}
 
     # interface switches:
     run = True
@@ -184,27 +194,31 @@ def game_loop(
         clock.tick(fps)
         window.fill(color_universe)
         recentre = False
+        rescale = False
         factor = None
         for event in pygame.event.get():
-            event_type = event.type
-            run = not (event_type == pygame.QUIT)
-            if event_type == pygame.KEYDOWN:
-                pressed_key = event.key
-                run &= not (
-                    (pressed_key == pygame.K_q)
-                    or (pressed_key == pygame.K_ESCAPE)
-                )
-                pause ^= pressed_key == pygame.K_SPACE
-                show_distance ^= pressed_key == pygame.K_d
-                draw_line ^= pressed_key == pygame.K_s
-                recentre = pressed_key == pygame.K_c
-            elif (event_type == pygame.MOUSEBUTTONDOWN) and (
-                event.button in {4, 5}
-            ):
-                factor = scale_factors[event.button - 4]
             if not run:
                 break
+            event_type = event.type
+            run = not (event_type == pygame.QUIT)
+            if event_type != pygame.KEYDOWN:
+                continue
+            pressed_key = event.key
+            run &= not (
+                (pressed_key == pygame.K_q) or (pressed_key == pygame.K_ESCAPE)
+            )
+            pause ^= pressed_key == pygame.K_SPACE
+            show_distance ^= pressed_key == pygame.K_d
+            draw_line ^= pressed_key == pygame.K_s
+            recentre = pressed_key == pygame.K_c
+            rescale = pressed_key == pygame.K_0
+            factor = scale_factors.get(pressed_key, None)
         if factor:
+            scale *= factor
+            for body in bodies:
+                body.update_scale(factor)
+        elif rescale:
+            factor = SCALE_PER_AU / (scale * AU)
             scale *= factor
             for body in bodies:
                 body.update_scale(factor)
