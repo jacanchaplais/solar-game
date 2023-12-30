@@ -271,6 +271,8 @@ def main(conf: dict[str, ty.Any]) -> None:
         bodies.append(body)
     bodies.sort(key=lambda b: abs(b.pos))
     sun = bodies[0]
+    if sun is not next(filter(lambda b: b.name.lower() == "sun", bodies)):
+        raise ValueError("Sun is not at the origin.")
 
     for pause, show_dist, draw_l, scale, shift in game_loop(
         window, scale, bodies, fps=100
