@@ -174,7 +174,7 @@ def key_message(
 
 def game_loop(
     window: pygame.Surface, scale: float, bodies: list[Body], fps: int = 60
-):
+) -> ty.Iterator[tuple[bool, bool, bool, float, tuple[float, float]]]:
     clock = pygame.time.Clock()
     color_universe = COLOR["universe"]
     scale_factors = {pygame.K_EQUALS: 1.25, pygame.K_MINUS: 0.75}
