@@ -45,8 +45,6 @@ class Body:
         "color",
         "mass",
         "orbit",
-        "sun",
-        "distance_to_sun",
     )
 
     def __init__(
@@ -70,8 +68,6 @@ class Body:
             pow(abs(x), 3) / (GRAV_CONST * SOLAR_MASS)
         )
         self.orbit = cl.deque(maxlen=math.ceil(period / TIMESTEP))
-        self.sun = False
-        self.distance_to_sun = 0.0
 
     @property
     def x_vel(self) -> float:
@@ -81,11 +77,12 @@ class Body:
     def y_vel(self) -> float:
         return self.vel.imag
 
+    def distance_to(self, body: ty.Self) -> float:
+        return abs(self.pos - body.pos)
+
     def attraction(self, other: ty.Self) -> complex:
         displacement = other.pos - self.pos
         distance, theta = cmath.polar(displacement)
-        if other.sun:
-            self.distance_to_sun = distance
         force = GRAV_CONST * self.mass * other.mass / (distance * distance)
         force = cmath.rect(force, theta)
         return force
@@ -112,6 +109,7 @@ def coord_disp(
 
 def draw(
     body: Body,
+    sun: Body,
     window: pygame.Surface,
     scale: float,
     show: bool,
@@ -133,11 +131,8 @@ def draw(
         pygame.draw.aalines(window, body.color, False, traj, 1)
     if not (display_dist and show):
         return
-    distance_text = font.render(
-        f"{round(body.distance_to_sun * 1.057 * 10 ** -16, 8)} light years",
-        True,
-        color,
-    )
+    distance = round(body.distance_to(sun) * 1.057 * 10 ** -16, 8)
+    distance_text = font.render(f"{distance} light years", True, color)
     window.blit(
         distance_text,
         (
@@ -275,7 +270,7 @@ def main(conf: dict[str, ty.Any]) -> None:
         body.vel *= rot_op
         bodies.append(body)
     bodies.sort(key=lambda b: abs(b.pos))
-    bodies[0].sun = True
+    sun = bodies[0]
 
     for pause, show_dist, draw_l, scale, shift in game_loop(
         window, scale, bodies, fps=100
@@ -284,6 +279,7 @@ def main(conf: dict[str, ty.Any]) -> None:
             not_sun = body_num != 0
             draw(
                 body,
+                sun,
                 window,
                 scale,
                 show_dist,
