@@ -199,12 +199,11 @@ def game_loop(
         for event in pygame.event.get():
             if not run:
                 break
-            event_type = event.type
-            run = not (event_type == pygame.QUIT)
-            if event_type != pygame.KEYDOWN:
+            if event.type != pygame.KEYDOWN:
+                run = not (event.type == pygame.QUIT)
                 continue
             pressed_key = event.key
-            run &= not (
+            run = not (
                 (pressed_key == pygame.K_q) or (pressed_key == pygame.K_ESCAPE)
             )
             pause ^= pressed_key == pygame.K_SPACE
