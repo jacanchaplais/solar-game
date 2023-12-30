@@ -21,6 +21,7 @@ TIMESTEP = CONST["SECONDS_PER_DAY"] * SIM["days_per_timestep"]
 SOLAR_MASS = CONST["SOLAR_MASS"]
 GRAV_CONST = CONST["GRAV_CONST"]
 AU = CONST["AU"]
+AU_PER_LIGHTYEAR = 1.057E-16
 COLOR_WHITE = COLOR["white"]
 
 SCALE_PER_AU = 200.0
@@ -131,8 +132,8 @@ def draw(
         pygame.draw.aalines(window, body.color, False, traj, 1)
     if not (display_dist and show):
         return
-    distance = round(body.distance_to(sun) * 1.057 * 10 ** -16, 8)
-    distance_text = font.render(f"{distance} light years", True, color)
+    distance = body.distance_to(sun) * AU_PER_LIGHTYEAR
+    distance_text = font.render(f"{distance:.2e} light years", True, color)
     window.blit(
         distance_text,
         (
