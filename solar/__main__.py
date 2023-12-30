@@ -21,7 +21,7 @@ TIMESTEP = CONST["SECONDS_PER_DAY"] * SIM["days_per_timestep"]
 SOLAR_MASS = CONST["SOLAR_MASS"]
 GRAV_CONST = CONST["GRAV_CONST"]
 AU = CONST["AU"]
-AU_PER_LIGHTYEAR = 1.057E-16
+LIGHTYEARS_PER_AU = 1.057E-16
 COLOR_WHITE = COLOR["white"]
 
 SCALE_PER_AU = 200.0
@@ -45,6 +45,7 @@ class Body:
         "radius",
         "color",
         "mass",
+        "_GM",
         "orbit",
     )
 
@@ -65,6 +66,7 @@ class Body:
         self.radius = radius
         self.color = color
         self.mass = mass
+        self._GM = mass * GRAV_CONST
         period = math.tau * math.sqrt(
             pow(abs(x), 3) / (GRAV_CONST * SOLAR_MASS)
         )
@@ -84,13 +86,13 @@ class Body:
     def attraction(self, other: ty.Self) -> complex:
         displacement = other.pos - self.pos
         distance, theta = cmath.polar(displacement)
-        force = GRAV_CONST * self.mass * other.mass / (distance * distance)
+        force = self._GM * other.mass / (distance * distance)
         force = cmath.rect(force, theta)
         return force
 
-    def update_position(self, bodies: list[ty.Self]) -> None:
+    def update_position(self, bodies: ty.Iterable[ty.Self]) -> None:
         total_force = complex(0.0, 0.0)
-        for body in filter(fn.partial(op.is_not, self), bodies):
+        for body in filter(lambda b: b is not self, bodies):
             total_force += self.attraction(body)
         self.vel += total_force * TIMESTEP / self.mass
         self.pos += self.vel * TIMESTEP
@@ -132,7 +134,7 @@ def draw(
         pygame.draw.aalines(window, body.color, False, traj, 1)
     if not (display_dist and show):
         return
-    distance = body.distance_to(sun) * AU_PER_LIGHTYEAR
+    distance = body.distance_to(sun) * LIGHTYEARS_PER_AU
     distance_text = font.render(f"{distance:.2e} light years", True, color)
     window.blit(
         distance_text,
@@ -141,20 +143,6 @@ def draw(
             y - 0.5 * distance_text.get_height() - 20.0,
         ),
     )
-
-
-class GameContext(ctx.ContextDecorator):
-    def __init__(self, title: str) -> None:
-        self.title = title
-
-    def __enter__(self: ty.Self) -> ty.Self:
-        pygame.init()
-        pygame.display.set_caption(self.title)
-        return self
-
-    def __exit__(self, *_) -> ty.Literal[False]:
-        pygame.quit()
-        return False
 
 
 def key_message(
@@ -240,6 +228,20 @@ def game_loop(
         for idx, body in enumerate(bodies, start=(len(KEY_TEXT) + 2)):
             key_key(f"- {body.name.capitalize()}", idx, color=body.color)
         pygame.display.update()
+
+
+class GameContext(ctx.ContextDecorator):
+    def __init__(self, title: str) -> None:
+        self.title = title
+
+    def __enter__(self: ty.Self) -> ty.Self:
+        pygame.init()
+        pygame.display.set_caption(self.title)
+        return self
+
+    def __exit__(self, *_) -> ty.Literal[False]:
+        pygame.quit()
+        return False
 
 
 @GameContext("Solar System Simulation")
