@@ -26,11 +26,11 @@ COLOR_WHITE = COLOR["white"]
 SCALE_PER_AU = 200.0
 
 KEY_TEXT = (
-    "Press X or ESC to exit",
-    "Press D to turn on/off distance",
-    "Press S to turn on/off drawing orbit lines",
-    "Use mouse or arrow keys to move around",
-    "Press C to center",
+    "Press q or ESC to exit",
+    "Press d to turn on/off distance",
+    "Press s to turn on/off drawing orbit lines",
+    "Use hjkl or arrow keys to move around",
+    "Press c to center",
     "Press Space to pause/unpause",
     "Use scroll-wheel to zoom",
 )
@@ -59,7 +59,7 @@ class Body:
         period = math.tau * math.sqrt(
             pow(abs(x), 3) / (GRAV_CONST * SOLAR_MASS)
         )
-        self.orbit = cl.deque(maxlen=int(period // TIMESTEP))
+        self.orbit = cl.deque(maxlen=math.ceil(period / TIMESTEP))
         self.sun = False
         self.distance_to_sun = 0.0
 
@@ -111,13 +111,16 @@ def draw(
     display_dist: bool,
     font: pygame.font.Font,
     color: tuple[int, int, int] = COLOR_WHITE,
+    num_segments: int = 1000,
 ) -> None:
     coord_ = fn.partial(coord_disp, scale=scale, move_x=move_x, move_y=move_y)
     x, y = coord_(body.pos.real, body.pos.imag)
     pygame.draw.circle(window, body.color, (x, y), body.radius)
-    if draw_line and (len(body.orbit) > 2):
-        traj = tuple(it.starmap(coord_, body.orbit))
-        pygame.draw.lines(window, body.color, False, traj, 1)
+    if draw_line and ((num_points := len(body.orbit)) > 2):
+        stride = (num_points // num_segments) + 1
+        orbit_points = it.islice(body.orbit, None, None, stride)
+        traj = tuple(it.starmap(coord_, orbit_points))
+        pygame.draw.aalines(window, body.color, False, traj, 1)
     if not (display_dist and show):
         return
     distance_text = font.render(
@@ -188,7 +191,7 @@ def game_loop(
             if event_type == pygame.KEYDOWN:
                 pressed_key = event.key
                 run &= not (
-                    (pressed_key == pygame.K_x)
+                    (pressed_key == pygame.K_q)
                     or (pressed_key == pygame.K_ESCAPE)
                 )
                 pause ^= pressed_key == pygame.K_SPACE
@@ -213,16 +216,14 @@ def game_loop(
         yield pause, show_distance, draw_line, scale, (move_x, move_y)
 
         keys = pygame.key.get_pressed()
-        mouse_x, mouse_y = pygame.mouse.get_pos()
-        window_w, window_h = pygame.display.get_surface().get_size()
         distance = 10
-        if keys[pygame.K_LEFT] or mouse_x == 0:
+        if keys[pygame.K_LEFT] or keys[pygame.K_h]:
             move_x += distance
-        if keys[pygame.K_RIGHT] or mouse_x == window_w - 1:
+        if keys[pygame.K_RIGHT] or keys[pygame.K_l]:
             move_x -= distance
-        if keys[pygame.K_UP] or mouse_y == 0:
+        if keys[pygame.K_UP] or keys[pygame.K_k]:
             move_y += distance
-        if keys[pygame.K_DOWN] or mouse_y == window_h - 1:
+        if keys[pygame.K_DOWN] or keys[pygame.K_j]:
             move_y -= distance
         key_key(f"FPS: {int(clock.get_fps())}", 0)
         for idx, msg in enumerate(KEY_TEXT, start=1):
@@ -264,7 +265,7 @@ def main(conf: dict[str, ty.Any]) -> None:
     bodies[0].sun = True
 
     for pause, show_dist, draw_l, scale, shift in game_loop(
-        window, scale, bodies
+        window, scale, bodies, fps=100
     ):
         for body_num, body in enumerate(bodies):
             not_sun = body_num != 0
