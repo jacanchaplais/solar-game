@@ -23,10 +23,11 @@ TIMESTEP = CONST["SECONDS_PER_DAY"] * SIM["days_per_timestep"]
 SOLAR_MASS = CONST["SOLAR_MASS"]
 GRAV_CONST = CONST["GRAV_CONST"]
 AU = CONST["AU"]
-LIGHTYEARS_PER_AU = 1.057E-16
+LIGHTYEARS_PER_AU = 1.057e-16
 COLOR_WHITE = COLOR["white"]
 
 SCALE_PER_AU = 200.0
+SCRIPT_DIR = Path(__file__).parent
 
 KEY_TEXT = (
     "Press q or ESC to exit",
@@ -232,6 +233,8 @@ class GameContext(ctx.ContextDecorator):
     def __enter__(self: ty.Self) -> ty.Self:
         pygame.init()
         pygame.display.set_caption(self.title)
+        icon = pygame.image.load(SCRIPT_DIR / "../icon.jpg")
+        pygame.display.set_icon(icon)
         return self
 
     def __exit__(self, *_) -> ty.Literal[False]:
