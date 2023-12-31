@@ -1,7 +1,6 @@
-import tomllib
 import io
+import tomllib
 from pathlib import Path
-
 
 __all__ = ["CONST", "COLOR", "SIM", "load_conf"]
 
