@@ -70,15 +70,8 @@ class Body:
         period = math.tau * math.sqrt(
             pow(abs(x), 3) / (GRAV_CONST * SOLAR_MASS)
         )
-        self.orbit = cl.deque(maxlen=math.ceil(period / TIMESTEP))
-
-    @property
-    def x_vel(self) -> float:
-        return self.vel.real
-
-    @property
-    def y_vel(self) -> float:
-        return self.vel.imag
+        num_orbit_steps = math.ceil(period / TIMESTEP)
+        self.orbit: cl.deque[complex] = cl.deque(maxlen=num_orbit_steps)
 
     def distance_to(self, body: ty.Self) -> float:
         return abs(self.pos - body.pos)
@@ -96,18 +89,19 @@ class Body:
             total_force += self.attraction(body)
         self.vel += total_force * TIMESTEP / self.mass
         self.pos += self.vel * TIMESTEP
-        self.orbit.append((self.pos.real, self.pos.imag))
+        self.orbit.append(self.pos)
 
     def update_scale(self, factor: float) -> None:
         self.radius *= factor
 
 
 def coord_disp(
-    x: float, y: float, scale: float, move_x: float = 0.0, move_y: float = 0.0
+    pos: complex, scale: float, shift: complex = complex(0.0, 0.0),
 ) -> tuple[float, float]:
-    half_width = 0.5 * pygame.display.Info().current_w
-    half_height = 0.5 * pygame.display.Info().current_h
-    return (x * scale + half_width + move_x, y * scale + half_height + move_y)
+    disp_info = pygame.display.Info()
+    half_res = 0.5 * complex(disp_info.current_w, disp_info.current_h)
+    pos_new = scale * pos + shift + half_res
+    return op.attrgetter("real", "imag")(pos_new)
 
 
 def draw(
@@ -116,21 +110,20 @@ def draw(
     window: pygame.Surface,
     scale: float,
     show: bool,
-    move_x: float,
-    move_y: float,
+    shift: complex,
     draw_line: bool,
     display_dist: bool,
     font: pygame.font.Font,
     color: tuple[int, int, int] = COLOR_WHITE,
     num_segments: int = 1000,
 ) -> None:
-    coord_ = fn.partial(coord_disp, scale=scale, move_x=move_x, move_y=move_y)
-    x, y = coord_(body.pos.real, body.pos.imag)
+    coord_ = fn.partial(coord_disp, scale=scale, shift=shift)
+    x, y = coord_(body.pos)
     pygame.draw.circle(window, body.color, (x, y), body.radius)
     if draw_line and ((num_points := len(body.orbit)) > 2):
         stride = (num_points // num_segments) + 1
         orbit_points = it.islice(body.orbit, None, None, stride)
-        traj = tuple(it.starmap(coord_, orbit_points))
+        traj = tuple(map(coord_, orbit_points))
         pygame.draw.aalines(window, body.color, False, traj, 1)
     if not (display_dist and show):
         return
@@ -158,7 +151,7 @@ def key_message(
 
 def game_loop(
     window: pygame.Surface, scale: float, bodies: list[Body], fps: int = 60
-) -> ty.Iterator[tuple[bool, bool, bool, float, tuple[float, float]]]:
+) -> ty.Iterator[tuple[bool, bool, bool, float, complex]]:
     clock = pygame.time.Clock()
     color_universe = COLOR["universe"]
     scale_factors = {pygame.K_EQUALS: 1.25, pygame.K_MINUS: 0.75}
@@ -172,7 +165,7 @@ def game_loop(
     font = pygame.font.SysFont("Trebuchet MS", 21)
     key_key = fn.partial(key_message, window=window, font=font)
 
-    move_x = move_y = 0.0
+    shift = complex(0.0, 0.0)
 
     while run:
         clock.tick(fps)
@@ -206,22 +199,20 @@ def game_loop(
             for body in bodies:
                 body.update_scale(factor)
         if recentre:
-            move_x, move_y = op.attrgetter("real", "imag")(
-                -bodies[0].pos * scale
-            )
+            shift = -bodies[0].pos * scale
 
-        yield pause, show_distance, draw_line, scale, (move_x, move_y)
+        yield pause, show_distance, draw_line, scale, shift
 
         keys = pygame.key.get_pressed()
         distance = 10
         if keys[pygame.K_LEFT] or keys[pygame.K_h]:
-            move_x += distance
+            shift += complex(distance, 0.0)
         if keys[pygame.K_RIGHT] or keys[pygame.K_l]:
-            move_x -= distance
+            shift -= complex(distance, 0.0)
         if keys[pygame.K_UP] or keys[pygame.K_k]:
-            move_y += distance
+            shift += complex(0.0, distance)
         if keys[pygame.K_DOWN] or keys[pygame.K_j]:
-            move_y -= distance
+            shift -= complex(0.0, distance)
         key_key(f"FPS: {int(clock.get_fps())}", 0)
         for idx, msg in enumerate(KEY_TEXT, start=1):
             key_key(msg, idx)
@@ -288,8 +279,7 @@ def main(conf: dict[str, ty.Any]) -> None:
                 window,
                 scale,
                 show_dist,
-                shift[0],
-                shift[1],
+                shift,
                 draw_l,
                 not_sun,
                 font,
