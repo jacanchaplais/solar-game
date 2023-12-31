@@ -178,6 +178,7 @@ def game_loop(
         recentre = False
         rescale = False
         factor = None
+        toggle_fullscreen = False
         for event in pygame.event.get():
             if not run:
                 break
@@ -194,6 +195,7 @@ def game_loop(
             recentre = pressed_key == pygame.K_c
             rescale = pressed_key == pygame.K_0
             factor = scale_factors.get(pressed_key, None)
+            toggle_fullscreen ^= pressed_key == pygame.K_f
         if factor:
             scale *= factor
             for body in bodies:
@@ -203,6 +205,9 @@ def game_loop(
             scale *= factor
             for body in bodies:
                 body.update_scale(factor)
+        if toggle_fullscreen:
+            pygame.display.toggle_fullscreen()
+            toggle_fullscreen = False
         if recentre:
             shift = -bodies[0].pos * scale
 
