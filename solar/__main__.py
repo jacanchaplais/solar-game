@@ -247,10 +247,21 @@ class GameContext(ctx.ContextDecorator):
         return False
 
 
+@click.command
+@click.option(
+    "-r",
+    "--resolution",
+    nargs=2,
+    type=click.IntRange(min=360),
+    default=(1280, 720),
+)
 @GameContext("Solar System Simulation")
-def main(conf: dict[str, ty.Any]) -> None:
+def main(resolution: tuple[int, int]) -> None:
+    with open(SCRIPT_DIR / "../config.toml", "rb") as f:
+        conf = load_conf(f)
+
     # pygame program variables:
-    window = pygame.display.set_mode()
+    window = pygame.display.set_mode(resolution)
     font = pygame.font.SysFont("Trebuchet MS", 16)
 
     # constants and units:
@@ -302,8 +313,4 @@ def main(conf: dict[str, ty.Any]) -> None:
 
 
 if __name__ == "__main__":
-    script_dir = Path(__file__).parent
-    config_path = script_dir / "../config.toml"
-    with open(config_path, "rb") as f:
-        conf = load_conf(f)
-    sys.exit(main(conf))
+    sys.exit(main())
