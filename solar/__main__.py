@@ -1,19 +1,21 @@
-import math
-from pathlib import Path
 import cmath
 import collections as cl
-import functools as fn
-import operator as op
-import sys
-import random
-import itertools as it
-import typing as ty
 import contextlib as ctx
+import functools as fn
+import itertools as it
+import math
+import operator as op
+import random
+import sys
+import typing as ty
+from pathlib import Path
 
-import pygame
+import click
 
-from . import CONST, COLOR, SIM, load_conf
+with ctx.redirect_stdout(None):
+    import pygame
 
+from . import COLOR, CONST, SIM, load_conf
 
 T = ty.TypeVar("T")
 
@@ -96,7 +98,9 @@ class Body:
 
 
 def coord_disp(
-    pos: complex, scale: float, shift: complex = complex(0.0, 0.0),
+    pos: complex,
+    scale: float,
+    shift: complex = complex(0.0, 0.0),
 ) -> tuple[float, float]:
     disp_info = pygame.display.Info()
     half_res = 0.5 * complex(disp_info.current_w, disp_info.current_h)
