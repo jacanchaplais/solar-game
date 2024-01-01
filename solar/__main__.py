@@ -155,7 +155,7 @@ def key_message(
 
 def game_loop(
     window: pygame.Surface, scale: float, bodies: list[Body], fps: int = 60
-) -> ty.Iterator[tuple[bool, bool, bool, float, complex]]:
+) -> ty.Iterator[tuple[bool, bool, bool, float, complex, complex]]:
     clock = pygame.time.Clock()
     color_universe = COLOR["universe"]
     scale_factors = {pygame.K_EQUALS: 1.25, pygame.K_MINUS: 0.75}
@@ -216,7 +216,9 @@ def game_loop(
         if recentre:
             shift = -bodies[0].pos * scale
 
-        yield pause, show_distance, draw_line, scale, shift
+        disp_info = pygame.display.Info()
+        half_res = 0.5 * complex(disp_info.current_w, disp_info.current_h)
+        yield pause, show_distance, draw_line, scale, half_res, shift
 
         keys = pygame.key.get_pressed()
         distance = 10
@@ -297,11 +299,9 @@ def main(resolution: tuple[int, int]) -> None:
     if sun is not next(filter(lambda b: b.name.lower() == "sun", bodies)):
         raise ValueError("Sun is not at the origin.")
 
-    for pause, show_dist, draw_l, scale, shift in game_loop(
+    for pause, show_dist, draw_l, scale, half_res, shift in game_loop(
         window, scale, bodies, fps=100
     ):
-        disp_info = pygame.display.Info()
-        half_res = 0.5 * complex(disp_info.current_w, disp_info.current_h)
         for body_num, body in enumerate(bodies):
             not_sun = body_num != 0
             draw(
