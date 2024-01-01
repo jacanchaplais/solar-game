@@ -101,12 +101,10 @@ class Body:
 def coord_disp(
     pos: complex,
     scale: float,
+    half_res: complex,
     shift: complex = complex(0.0, 0.0),
 ) -> tuple[float, float]:
-    disp_info = pygame.display.Info()
-    half_res = 0.5 * complex(disp_info.current_w, disp_info.current_h)
-    pos_new = scale * pos + shift + half_res
-    return op.attrgetter("real", "imag")(pos_new)
+    return op.attrgetter("real", "imag")(scale * pos + shift + half_res)
 
 
 def draw(
@@ -122,13 +120,15 @@ def draw(
     color: tuple[int, int, int] = COLOR_WHITE,
     num_segments: int = 1000,
 ) -> None:
-    coord_ = fn.partial(coord_disp, scale=scale, shift=shift)
-    x, y = coord_(body.pos)
+    disp_info = pygame.display.Info()
+    half_res = 0.5 * complex(disp_info.current_w, disp_info.current_h)
+    coord = fn.partial(coord_disp, scale=scale, half_res=half_res, shift=shift)
+    x, y = coord(body.pos)
     pygame.draw.circle(window, body.color, (x, y), body.radius)
     if draw_line and ((num_points := len(body.orbit)) > 2):
         stride = (num_points // num_segments) + 1
         orbit_points = it.islice(body.orbit, None, None, stride)
-        traj = tuple(map(coord_, orbit_points))
+        traj = tuple(map(coord, orbit_points))
         pygame.draw.aalines(window, body.color, False, traj, 1)
     if not (display_dist and show):
         return
