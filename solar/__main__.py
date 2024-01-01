@@ -31,12 +31,14 @@ SCRIPT_DIR = Path(__file__).parent
 
 KEY_TEXT = (
     "Press q or ESC to exit",
+    "Press i to hide / show this text",
     "Press d to turn on / off distance",
     "Press s to turn on / off drawing orbit lines",
     "Use hjkl or arrow keys to move around",
     "Press c to center",
     "Press Space to pause / unpause",
     "Use - / + to zoom, and 0 to reset",
+    "Use ] / [ to increase / decrease target FPS",
 )
 
 
@@ -77,20 +79,18 @@ class Body:
         self.orbit: cl.deque[complex] = cl.deque(maxlen=num_orbit_steps)
 
     def distance_to(self, body: ty.Self) -> float:
-        return abs(self.pos - body.pos)
+        return abs(body.pos - self.pos)
 
     def attraction(self, other: ty.Self) -> complex:
         displacement = other.pos - self.pos
-        distance, theta = cmath.polar(displacement)
-        force = self._GM * other.mass / (distance * distance)
-        force = cmath.rect(force, theta)
-        return force
+        dist_recip = 1.0 / abs(displacement)
+        force_mag = self._GM * other.mass * dist_recip * dist_recip
+        return force_mag * (displacement * dist_recip)
 
     def update_position(self, bodies: ty.Iterable[ty.Self]) -> None:
-        total_force = complex(0.0, 0.0)
-        for body in filter(lambda b: b is not self, bodies):
-            total_force += self.attraction(body)
-        self.vel += total_force * TIMESTEP / self.mass
+        bodies = filter(lambda b: b is not self, bodies)
+        tot_force = sum(map(self.attraction, bodies), start=complex(0.0, 0.0))
+        self.vel += tot_force * TIMESTEP / self.mass
         self.pos += self.vel * TIMESTEP
         self.orbit.append(self.pos)
 
@@ -160,6 +160,7 @@ def game_loop(
     clock = pygame.time.Clock()
     color_universe = COLOR["universe"]
     scale_factors = {pygame.K_EQUALS: 1.25, pygame.K_MINUS: 0.75}
+    rate_factors = {pygame.K_RIGHTBRACKET: 1.25, pygame.K_LEFTBRACKET: 0.75}
 
     # interface switches:
     run = True
@@ -171,13 +172,14 @@ def game_loop(
     key_key = fn.partial(key_message, window=window, font=font)
 
     shift = complex(0.0, 0.0)
+    display_info = True
 
     while run:
         clock.tick(fps)
         window.fill(color_universe)
         recentre = False
         rescale = False
-        factor = None
+        factor = fps_factor = None
         toggle_fullscreen = False
         for event in pygame.event.get():
             if not run:
@@ -195,11 +197,15 @@ def game_loop(
             recentre = pressed_key == pygame.K_c
             rescale = pressed_key == pygame.K_0
             factor = scale_factors.get(pressed_key, None)
+            fps_factor = rate_factors.get(pressed_key, None)
             toggle_fullscreen ^= pressed_key == pygame.K_f
+            display_info ^= pressed_key == pygame.K_i
         if factor:
             scale *= factor
             for body in bodies:
                 body.update_scale(factor)
+        if fps_factor:
+            fps = min(max(10, math.ceil(fps_factor * fps)), 200)
         elif rescale:
             factor = SCALE_PER_AU / (scale * AU)
             scale *= factor
@@ -223,11 +229,12 @@ def game_loop(
             shift += complex(0.0, distance)
         if keys[pygame.K_DOWN] or keys[pygame.K_j]:
             shift -= complex(0.0, distance)
-        key_key(f"FPS: {int(clock.get_fps())}", 0)
-        for idx, msg in enumerate(KEY_TEXT, start=1):
-            key_key(msg, idx)
-        for idx, body in enumerate(bodies, start=(len(KEY_TEXT) + 2)):
-            key_key(f"- {body.name.capitalize()}", idx, color=body.color)
+        if display_info:
+            key_key(f"FPS: {int(clock.get_fps())}, target: {fps}", 0)
+            for idx, msg in enumerate(KEY_TEXT, start=1):
+                key_key(msg, idx)
+            for idx, body in enumerate(bodies, start=(len(KEY_TEXT) + 2)):
+                key_key(f"- {body.name.capitalize()}", idx, color=body.color)
         pygame.display.update()
 
 
