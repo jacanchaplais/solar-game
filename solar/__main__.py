@@ -116,7 +116,6 @@ def draw(
     half_res: complex,
     show: bool,
     draw_line: bool,
-    display_dist: bool,
     font: pygame.font.Font,
     color: tuple[int, int, int] = COLOR_WHITE,
     num_segments: int = 1000,
@@ -129,7 +128,7 @@ def draw(
         orbit_points = it.islice(body.orbit, None, None, stride)
         traj = tuple(map(coord, orbit_points))
         pygame.draw.aalines(window, body.color, False, traj, 1)
-    if not (display_dist and show):
+    if not (show and (body is not sun)):
         return
     distance = body.distance_to(sun) * LIGHTYEARS_PER_AU
     distance_text = font.render(f"{distance:.2e} light years", True, color)
@@ -278,7 +277,7 @@ def main(resolution: tuple[int, int]) -> None:
     solar_mass = CONST["SOLAR_MASS"]
 
     # populating and sorting the bodies from the config file:
-    bodies = []
+    bodies: list[Body] = []
     for name, props in conf["bodies"].items():
         rot_op = cmath.rect(1.0, random.uniform(0.0, math.tau))
         body = Body(
@@ -299,23 +298,11 @@ def main(resolution: tuple[int, int]) -> None:
     if sun is not next(filter(lambda b: b.name.lower() == "sun", bodies)):
         raise ValueError("Sun is not at the origin.")
 
-    for pause, show_dist, draw_l, scale, half_res, shift in game_loop(
+    for pause, show, draw_l, scale, half_res, shift in game_loop(
         window, scale, bodies, fps=100
     ):
-        for body_num, body in enumerate(bodies):
-            not_sun = body_num != 0
-            draw(
-                body,
-                sun,
-                window,
-                scale,
-                shift,
-                half_res,
-                show_dist,
-                draw_l,
-                not_sun,
-                font,
-            )
+        for body in bodies:
+            draw(body, sun, window, scale, shift, half_res, show, draw_l, font)
             if pause:
                 continue
             body.update_position(bodies)
