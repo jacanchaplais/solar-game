@@ -112,16 +112,15 @@ def draw(
     sun: Body,
     window: pygame.Surface,
     scale: float,
-    show: bool,
     shift: complex,
+    half_res: complex,
+    show: bool,
     draw_line: bool,
     display_dist: bool,
     font: pygame.font.Font,
     color: tuple[int, int, int] = COLOR_WHITE,
     num_segments: int = 1000,
 ) -> None:
-    disp_info = pygame.display.Info()
-    half_res = 0.5 * complex(disp_info.current_w, disp_info.current_h)
     coord = fn.partial(coord_disp, scale=scale, half_res=half_res, shift=shift)
     x, y = coord(body.pos)
     pygame.draw.circle(window, body.color, (x, y), body.radius)
@@ -301,6 +300,8 @@ def main(resolution: tuple[int, int]) -> None:
     for pause, show_dist, draw_l, scale, shift in game_loop(
         window, scale, bodies, fps=100
     ):
+        disp_info = pygame.display.Info()
+        half_res = 0.5 * complex(disp_info.current_w, disp_info.current_h)
         for body_num, body in enumerate(bodies):
             not_sun = body_num != 0
             draw(
@@ -308,8 +309,9 @@ def main(resolution: tuple[int, int]) -> None:
                 sun,
                 window,
                 scale,
-                show_dist,
                 shift,
+                half_res,
+                show_dist,
                 draw_l,
                 not_sun,
                 font,
