@@ -110,25 +110,26 @@ def coord_disp(
 def draw(
     body: Body,
     sun: Body,
-    window: pygame.Surface,
     scale: float,
     shift: complex,
     half_res: complex,
     show: bool,
     draw_line: bool,
+    window: pygame.Surface,
     font: pygame.font.Font,
     color: tuple[int, int, int] = COLOR_WHITE,
-    num_segments: int = 1000,
+    num_segments: int = 360,
 ) -> None:
     coord = fn.partial(coord_disp, scale=scale, half_res=half_res, shift=shift)
     x, y = coord(body.pos)
     pygame.draw.circle(window, body.color, (x, y), body.radius)
     if draw_line and ((num_points := len(body.orbit)) > 2):
         stride = (num_points // num_segments) + 1
-        orbit_points = it.islice(body.orbit, None, None, stride)
+        orbit_points = it.islice(body.orbit, None, num_points - 1, stride)
+        orbit_points = it.chain(orbit_points, (body.orbit[-1],))
         traj = tuple(map(coord, orbit_points))
         pygame.draw.aalines(window, body.color, False, traj, 1)
-    if not (show and (body is not sun)):
+    if (not show) or (body is sun):
         return
     distance = body.distance_to(sun) * LIGHTYEARS_PER_AU
     distance_text = font.render(f"{distance:.2e} light years", True, color)
@@ -152,9 +153,12 @@ def key_message(
     window.blit(font.render(message, True, color), (15, offset))
 
 
+GameLoop = ty.Iterator[tuple[Body, bool, bool, bool, float, complex, complex]]
+
+
 def game_loop(
     window: pygame.Surface, scale: float, bodies: list[Body], fps: int = 60
-) -> ty.Iterator[tuple[bool, bool, bool, float, complex, complex]]:
+) -> GameLoop:
     clock = pygame.time.Clock()
     color_universe = COLOR["universe"]
     scale_factors = {pygame.K_EQUALS: 1.25, pygame.K_MINUS: 0.75}
@@ -217,7 +221,9 @@ def game_loop(
 
         disp_info = pygame.display.Info()
         half_res = 0.5 * complex(disp_info.current_w, disp_info.current_h)
-        yield pause, show_distance, draw_line, scale, half_res, shift
+
+        data = pause, show_distance, draw_line, scale, half_res, shift
+        yield from ((body, *data) for body in bodies)
 
         keys = pygame.key.get_pressed()
         distance = 10
@@ -270,6 +276,7 @@ def main(resolution: tuple[int, int]) -> None:
     # pygame program variables:
     window = pygame.display.set_mode(resolution)
     font = pygame.font.SysFont("Trebuchet MS", 16)
+    draw_ = fn.partial(draw, window=window, font=font)
 
     # constants and units:
     scale = SCALE_PER_AU / AU
@@ -298,14 +305,12 @@ def main(resolution: tuple[int, int]) -> None:
     if sun is not next(filter(lambda b: b.name.lower() == "sun", bodies)):
         raise ValueError("Sun is not at the origin.")
 
-    for pause, show, draw_l, scale, half_res, shift in game_loop(
-        window, scale, bodies, fps=100
-    ):
-        for body in bodies:
-            draw(body, sun, window, scale, shift, half_res, show, draw_l, font)
-            if pause:
-                continue
-            body.update_position(bodies)
+    loop = game_loop(window, scale, bodies, fps=100)
+    for body, pause, show, draw_l, scale, half_res, shift in loop:
+        draw_(body, sun, scale, shift, half_res, show, draw_l)
+        if pause:
+            continue
+        body.update_position(bodies)
 
 
 if __name__ == "__main__":
