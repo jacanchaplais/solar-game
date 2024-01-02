@@ -78,8 +78,8 @@ class Body:
         num_orbit_steps = math.ceil(period / TIMESTEP)
         self.orbit: cl.deque[complex] = cl.deque(maxlen=num_orbit_steps)
 
-    def distance_to(self, body: ty.Self) -> float:
-        return abs(body.pos - self.pos)
+    def distance_to(self, other: ty.Self) -> float:
+        return abs(other.pos - self.pos)
 
     def attraction(self, other: ty.Self) -> complex:
         displacement = other.pos - self.pos
@@ -87,15 +87,28 @@ class Body:
         force_mag = self._GM * other.mass * dist_recip * dist_recip
         return force_mag * (displacement * dist_recip)
 
-    def update_position(self, bodies: ty.Iterable[ty.Self]) -> None:
-        bodies = filter(lambda b: b is not self, bodies)
-        tot_force = sum(map(self.attraction, bodies), start=complex(0.0, 0.0))
-        self.vel += tot_force * TIMESTEP / self.mass
+    def update_position(self, force: complex) -> None:
+        self.vel += force * TIMESTEP / self.mass
         self.pos += self.vel * TIMESTEP
         self.orbit.append(self.pos)
 
     def update_scale(self, factor: float) -> None:
         self.radius *= factor
+
+
+def grav_forces(bodies: ty.Sequence[Body]) -> list[complex]:
+    num_bodies = len(bodies)
+    forces = [complex(0.0, 0.0)] * num_bodies
+    for idx_i, idx_j in it.combinations(range(num_bodies), 2):
+        pairwise_acc = bodies[idx_i].attraction(bodies[idx_j])
+        forces[idx_i] += pairwise_acc
+        forces[idx_j] -= pairwise_acc
+    return forces
+
+
+def evolve_bodies(bodies: list[Body]) -> None:
+    for body, force in zip(bodies, grav_forces(bodies)):
+        body.update_position(force)
 
 
 def coord_disp(
@@ -153,7 +166,7 @@ def key_message(
     window.blit(font.render(message, True, color), (15, offset))
 
 
-GameLoop = ty.Iterator[tuple[Body, bool, bool, bool, float, complex, complex]]
+GameLoop = ty.Iterator[tuple[bool, bool, bool, float, complex, complex]]
 
 
 def game_loop(
@@ -223,7 +236,7 @@ def game_loop(
         half_res = 0.5 * complex(disp_info.current_w, disp_info.current_h)
 
         data = pause, show_distance, draw_line, scale, half_res, shift
-        yield from ((body, *data) for body in bodies)
+        yield data  # from ((body, *data) for body in bodies)
 
         keys = pygame.key.get_pressed()
         distance = 10
@@ -306,11 +319,12 @@ def main(resolution: tuple[int, int]) -> None:
         raise ValueError("Sun is not at the origin.")
 
     loop = game_loop(window, scale, bodies, fps=100)
-    for body, pause, show, draw_l, scale, half_res, shift in loop:
-        draw_(body, sun, scale, shift, half_res, show, draw_l)
+    for pause, show, draw_l, scale, half_res, shift in loop:
+        for body in bodies:
+            draw_(body, sun, scale, shift, half_res, show, draw_l)
         if pause:
             continue
-        body.update_position(bodies)
+        evolve_bodies(bodies)
 
 
 if __name__ == "__main__":
