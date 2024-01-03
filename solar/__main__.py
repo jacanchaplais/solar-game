@@ -43,37 +43,26 @@ KEY_TEXT = (
 
 
 class Body:
-    __slots__ = (
-        "name",
-        "pos",
-        "vel",
-        "radius",
-        "color",
-        "mass",
-        "_GM",
-        "orbit",
-    )
+    __slots__ = "name", "mass", "pos", "vel", "radius", "color", "_GM", "orbit"
 
     def __init__(
         self,
         name: str,
-        x: float,
-        y: float,
-        vel_x: float,
-        vel_y: float,
+        mass: float,
+        pos: complex,
+        vel: complex,
         radius: float,
         color: tuple[int, int, int],
-        mass: float,
     ) -> None:
         self.name = name
-        self.pos = complex(x, y)
-        self.vel = complex(vel_x, vel_y)
+        self.pos = pos
+        self.vel = vel
         self.radius = radius
         self.color = color
         self.mass = mass
         self._GM = mass * GRAV_CONST
         period = math.tau * math.sqrt(
-            pow(abs(x), 3) / (GRAV_CONST * SOLAR_MASS)
+            pow(abs(pos), 3) / (GRAV_CONST * SOLAR_MASS)
         )
         num_orbit_steps = math.ceil(period / TIMESTEP)
         self.orbit: cl.deque[complex] = cl.deque(maxlen=num_orbit_steps)
@@ -81,7 +70,7 @@ class Body:
     def distance_to(self, other: ty.Self) -> float:
         return abs(other.pos - self.pos)
 
-    def attraction(self, other: ty.Self) -> complex:
+    def attraction_to(self, other: ty.Self) -> complex:
         displacement = other.pos - self.pos
         dist_recip = 1.0 / abs(displacement)
         force_mag = self._GM * other.mass * dist_recip * dist_recip
@@ -97,16 +86,15 @@ class Body:
 
 
 def grav_forces(bodies: ty.Sequence[Body]) -> list[complex]:
-    num_bodies = len(bodies)
-    forces = [complex(0.0, 0.0)] * num_bodies
-    for idx_i, idx_j in it.combinations(range(num_bodies), 2):
-        pairwise_acc = bodies[idx_i].attraction(bodies[idx_j])
-        forces[idx_i] += pairwise_acc
-        forces[idx_j] -= pairwise_acc
+    forces = [complex(0.0, 0.0)] * len(bodies)
+    for (i, body_i), (j, body_j) in it.combinations(enumerate(bodies), 2):
+        pairwise_force = body_i.attraction_to(body_j)
+        forces[i] += pairwise_force
+        forces[j] -= pairwise_force
     return forces
 
 
-def evolve_bodies(bodies: list[Body]) -> None:
+def evolve_bodies(bodies: ty.Sequence[Body]) -> None:
     for body, force in zip(bodies, grav_forces(bodies)):
         body.update_position(force)
 
@@ -170,7 +158,10 @@ GameLoop = ty.Iterator[tuple[bool, bool, bool, float, complex, complex]]
 
 
 def game_loop(
-    window: pygame.Surface, scale: float, bodies: list[Body], fps: int = 60
+    window: pygame.Surface,
+    scale: float,
+    bodies: ty.Sequence[Body],
+    fps: int = 60,
 ) -> GameLoop:
     clock = pygame.time.Clock()
     color_universe = COLOR["universe"]
@@ -302,16 +293,12 @@ def main(resolution: tuple[int, int]) -> None:
         rot_op = cmath.rect(1.0, random.uniform(0.0, math.tau))
         body = Body(
             name=name,
-            x=-props["distance"] * AU,
-            y=0.0,
-            vel_x=0.0,
-            vel_y=props["speed"] * unit_speed,
+            mass=props["mass"] * solar_mass,
+            pos=rot_op * complex(-props["distance"] * AU, 0.0),
+            vel=rot_op * complex(0.0, props["speed"] * unit_speed),
             radius=props["radius"] * AU * scale,
             color=COLOR[name],
-            mass=props["mass"] * solar_mass,
         )
-        body.pos *= rot_op
-        body.vel *= rot_op
         bodies.append(body)
     bodies.sort(key=lambda b: abs(b.pos))
     sun = bodies[0]
