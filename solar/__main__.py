@@ -2,6 +2,7 @@ import cmath
 import collections as cl
 import contextlib as ctx
 import functools as fn
+import io
 import itertools as it
 import math
 import operator as op
@@ -30,7 +31,7 @@ SCALE_PER_AU = 200.0
 SCRIPT_DIR = Path(__file__).parent
 
 KEY_TEXT = (
-    "Press q or ESC to exit",
+    "Press q to exit",
     "Press i to hide / show this text",
     "Press d to turn on / off distance",
     "Press s to turn on / off drawing orbit lines",
@@ -40,6 +41,62 @@ KEY_TEXT = (
     "Use - / + to zoom, and 0 to reset",
     "Use ] / [ to increase / decrease target FPS",
 )
+
+
+class TextBox:
+    def __init__(self, font: pygame.font.Font, color: pygame.Color) -> None:
+        self.active = False
+        self._buffer = io.StringIO()
+        self.toggled = False
+        self.font = font
+        self.color = color
+        self._box = pygame.Rect(100, 100, 140, 32)
+
+    def _toggle_active(self) -> None:
+        self.active = not self.active
+        self.toggle = True
+
+    def _update_active(self, pressed_key: int) -> None:
+        active = prev_active = self.active
+        active ^= (not active) and (pressed_key == pygame.K_SLASH)
+        active ^= (active) and (pressed_key == pygame.K_ESCAPE)
+        self.active = active
+        self.toggled = active != prev_active
+
+    def clear(self) -> None:
+        self._buffer.seek(0)
+        self._buffer.truncate(0)
+
+    def update(self, pressed_key: int, unicode: str) -> ty.Optional[str]:
+        self._update_active(pressed_key)
+        if not self.active:
+            return
+        buffer = self._buffer
+        if pressed_key == pygame.K_RETURN:
+            self._toggle_active()
+            return buffer.getvalue()
+        elif pressed_key == pygame.K_BACKSPACE:
+            cursor_pos = buffer.tell() - 1
+            if cursor_pos < 0:
+                return
+            buffer.seek(cursor_pos)
+            buffer.truncate(cursor_pos)
+        else:
+            buffer.write(unicode)
+        if self.toggled:
+            self.clear()
+
+    def draw(self, screen: pygame.Surface) -> None:
+        if not self.active:
+            return
+        screen_width = screen.get_width()
+        text_surface = self.font.render(self._buffer.getvalue(), True, self.color)
+        text_width = text_surface.get_width()
+        width = max(200, text_width + 10)
+        self._box.w = width
+        self._box.x = screen_width - width - 5
+        screen.blit(text_surface, (self._box.x+5, self._box.y+5))
+        pygame.draw.rect(screen, self.color, self._box, 2)
 
 
 class Body:
@@ -179,6 +236,8 @@ def game_loop(
 
     shift = complex(0.0, 0.0)
     display_info = True
+    color = pygame.Color('lightskyblue3')
+    input_box = TextBox(font, color)
 
     while run:
         clock.tick(fps)
@@ -193,10 +252,15 @@ def game_loop(
             if event.type != pygame.KEYDOWN:
                 run = not (event.type == pygame.QUIT)
                 continue
-            pressed_key = event.key
-            run = not (
-                (pressed_key == pygame.K_q) or (pressed_key == pygame.K_ESCAPE)
-            )
+            pressed_key, key_char = event.key, event.unicode
+            text = input_box.update(pressed_key, key_char)
+            if text is not None:
+                body = next(filter(lambda b: b.name.lower() == text.lower(), bodies), None)
+                if body is not None:
+                    body.color = COLOR_WHITE
+            if input_box.active:
+                continue
+            run = not (pressed_key == pygame.K_q)
             pause ^= pressed_key == pygame.K_SPACE
             show_distance ^= pressed_key == pygame.K_d
             draw_line ^= pressed_key == pygame.K_s
@@ -231,20 +295,22 @@ def game_loop(
 
         keys = pygame.key.get_pressed()
         distance = 10
-        if keys[pygame.K_LEFT] or keys[pygame.K_h]:
-            shift += complex(distance, 0.0)
-        if keys[pygame.K_RIGHT] or keys[pygame.K_l]:
-            shift -= complex(distance, 0.0)
-        if keys[pygame.K_UP] or keys[pygame.K_k]:
-            shift += complex(0.0, distance)
-        if keys[pygame.K_DOWN] or keys[pygame.K_j]:
-            shift -= complex(0.0, distance)
+        if not input_box.active:
+            if keys[pygame.K_LEFT] or keys[pygame.K_h]:
+                shift += complex(distance, 0.0)
+            if keys[pygame.K_RIGHT] or keys[pygame.K_l]:
+                shift -= complex(distance, 0.0)
+            if keys[pygame.K_UP] or keys[pygame.K_k]:
+                shift += complex(0.0, distance)
+            if keys[pygame.K_DOWN] or keys[pygame.K_j]:
+                shift -= complex(0.0, distance)
         if display_info:
             key_key(f"FPS: {int(clock.get_fps())}, target: {fps}", 0)
             for idx, msg in enumerate(KEY_TEXT, start=1):
                 key_key(msg, idx)
             for idx, body in enumerate(bodies, start=(len(KEY_TEXT) + 2)):
                 key_key(f"- {body.name.capitalize()}", idx, color=body.color)
+        input_box.draw(window)
         pygame.display.update()
 
 
