@@ -1,0 +1,33 @@
+bgcolor = [ 36, 36, 36 ]
+
+[bodies.sun]
+mass = 1.0
+radius = 2.0053E-01
+distance = 5.204
+speed = 6.0E-03
+angle = "0/2"
+color = [ 252, 150, 1 ]
+
+[bodies.jacan]
+mass = 1.0
+radius = 2.0053E-01
+distance = 5.204
+speed = 6.0E-03
+angle = "1/2"  # in units of pi
+color = [ 173, 168, 165 ]
+
+[bodies.mike]
+mass = 1.0
+radius = 2.0053E-01
+distance = 5.204
+speed = 6.0E-03
+angle = "2/2"
+color = [ 193, 68, 14 ]
+
+[bodies.ewan]
+mass = 1.0
+radius = 2.0053E-01
+distance = 5.204
+speed = 6.0E-03
+angle = "3/2"
+color = [ 107, 147, 214 ]

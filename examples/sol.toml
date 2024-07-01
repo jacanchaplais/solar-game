@@ -1,0 +1,65 @@
+bgcolor = [ 36, 36, 36 ]
+
+[bodies.sun]
+mass = 1.0  # in solar masses
+radius = 2.0053E-01  # radius of body, in AU
+distance = 0.0  # from the origin, in AU
+speed = 0.0  # in AU per day
+color = [ 252, 150, 1 ]  # RGB values
+# angle = "0/1"  # in units of pi rad
+
+[bodies.mercury]
+mass = 1.6592E-07
+radius = 3.3422E-02
+distance = 0.387
+speed = 2.738E-02
+color = [ 173, 168, 165 ]
+
+[bodies.venus]
+mass = 2.4478E-06
+radius = 6.0160E-02
+distance = 0.723
+speed = 2.023E-02
+color = [ 227, 158, 28 ]
+
+[bodies.earth]
+mass = 3.0027E-06
+radius = 6.6845E-02
+distance = 1.0
+speed = 1.720E-02
+color = [ 107, 147, 214 ]
+
+[bodies.mars]
+mass = 3.2128E-07
+radius = 3.3422E-02
+distance = 1.524
+speed = 1.391E-02
+color = [ 193, 68, 14 ]
+
+[bodies.jupiter]
+mass = 0.00095428
+radius = 1.3369E-01
+distance = 5.204
+speed = 7.543E-03
+color = [ 216, 202, 157 ]
+
+[bodies.saturn]
+mass = 0.00028573
+radius = 1.2032E-01
+distance = 9.573
+speed = 5.591E-03
+color = [ 191, 189, 175 ]
+
+[bodies.uranus]
+mass = 4.3646E-05
+radius = 9.3583E-02
+distance = 19.165
+speed = 3.927E-03
+color = [ 209, 231, 231 ]
+
+[bodies.neptune]
+mass = 5.1485E-05
+radius = 8.0214E-02
+distance = 30.178
+speed = 3.136E-03
+color = [ 63, 84, 186 ]
