@@ -107,7 +107,7 @@ class TextBox:
 
 
 class Body:
-    __slots__ = "name", "mass", "pos", "vel", "radius", "color", "_GM", "orbit"
+    __slots__ = "name", "mass", "pos", "vel", "radius", "_color", "orbit", "active"
 
     def __init__(
         self,
@@ -122,14 +122,20 @@ class Body:
         self.pos = pos
         self.vel = vel
         self.radius = radius
-        self.color = color
+        self._color = color
         self.mass = mass
-        self._GM = mass * GRAV_CONST
         period = math.tau * math.sqrt(
             pow(abs(pos), 3) / (GRAV_CONST * SOLAR_MASS)
         )
         num_orbit_steps = math.ceil(period / TIMESTEP)
         self.orbit: cl.deque[complex] = cl.deque(maxlen=num_orbit_steps)
+        self.active = False
+
+    @property
+    def color(self) -> tuple[int, int, int]:
+        if self.active:
+            return COLOR_WHITE
+        return self._color
 
     def distance_to(self, other: ty.Self) -> float:
         return abs(other.pos - self.pos)
@@ -137,7 +143,7 @@ class Body:
     def attraction_to(self, other: ty.Self) -> complex:
         displacement = other.pos - self.pos
         dist_recip = 1.0 / abs(displacement)
-        force_mag = self._GM * other.mass * dist_recip * dist_recip
+        force_mag = GRAV_CONST * self.mass * other.mass * dist_recip * dist_recip
         return force_mag * (displacement * dist_recip)
 
     def update_position(self, force: complex) -> None:
