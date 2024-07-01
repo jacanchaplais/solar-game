@@ -243,6 +243,7 @@ def game_loop(
     pause = False
     show_distance = False
     draw_line = True
+    active_body = None
 
     font = pygame.font.SysFont("Trebuchet MS", 21)
     key_key = fn.partial(key_message, window=window, font=font)
@@ -252,10 +253,10 @@ def game_loop(
     color = pygame.Color('lightskyblue3')
     input_box = TextBox(font, color)
 
+    recentre = False
     while run:
         clock.tick(fps)
-        window.fill(color_universe)
-        recentre = False
+        window.fill(bg_color)
         rescale = False
         factor = fps_factor = None
         toggle_fullscreen = False
@@ -268,27 +269,35 @@ def game_loop(
             pressed_key, key_char = event.key, event.unicode
             text = input_box.update(pressed_key, key_char)
             if text is not None:
-                body = next(filter(lambda b: b.name.lower() == text.lower(), bodies), None)
-                if body is not None:
-                    body.color = COLOR_WHITE
+                if active_body is not None:
+                    active_body.active = False
+                active_body = next(filter(lambda b: b.name.lower() == text.lower(), bodies), None)
+                if active_body is not None:
+                    active_body.active = True
             if input_box.active:
                 continue
             run = not (pressed_key == pygame.K_q)
             pause ^= pressed_key == pygame.K_SPACE
             show_distance ^= pressed_key == pygame.K_d
             draw_line ^= pressed_key == pygame.K_s
-            recentre = pressed_key == pygame.K_c
+            recentre ^= pressed_key == pygame.K_c
             rescale = pressed_key == pygame.K_0
             factor = scale_factors.get(pressed_key, None)
             fps_factor = rate_factors.get(pressed_key, None)
             toggle_fullscreen ^= pressed_key == pygame.K_f
             display_info ^= pressed_key == pygame.K_i
+            if not active_body:
+                continue
+            if key_char == "m":
+                active_body.mass *= 0.8
+            elif key_char == "M":
+                active_body.mass *= 1.2
         if factor:
             scale *= factor
             for body in bodies:
                 body.update_scale(factor)
         if fps_factor:
-            fps = min(max(10, math.ceil(fps_factor * fps)), 200)
+            fps = min(max(10, math.ceil(fps_factor * fps)), 300)
         elif rescale:
             factor = SCALE_PER_AU / (scale * AU)
             scale *= factor
@@ -297,8 +306,8 @@ def game_loop(
         if toggle_fullscreen:
             pygame.display.toggle_fullscreen()
             toggle_fullscreen = False
-        if recentre:
-            shift = -bodies[0].pos * scale
+        if recentre and active_body:
+            shift = -active_body.pos * scale
 
         disp_info = pygame.display.Info()
         half_res = 0.5 * complex(disp_info.current_w, disp_info.current_h)
