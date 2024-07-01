@@ -365,10 +365,15 @@ def load_conf(fileobj: io.IOBase):
     type=click.IntRange(min=360),
     default=(1280, 720),
 )
+@click.option(
+    "-c",
+    "--config",
+    type=click.File(mode="rb"),
+    default=None,
+)
 @GameContext("Solar System Simulation")
-def main(resolution: tuple[int, int]) -> None:
-    with open(SCRIPT_DIR / "../config.toml", "rb") as f:
-        conf = load_conf(f)
+def main(resolution: tuple[int, int], config: ty.BinaryIO) -> None:
+    conf = load_conf(config)
 
     # pygame program variables:
     window = pygame.display.set_mode(resolution)
