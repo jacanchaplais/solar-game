@@ -8,7 +8,9 @@ import math
 import operator as op
 import random
 import sys
+import tomllib
 import typing as ty
+from fractions import Fraction
 from pathlib import Path
 
 import click
@@ -16,19 +18,19 @@ import click
 with ctx.redirect_stdout(None):
     import pygame
 
-from . import COLOR, CONST, SIM, load_conf
-
-T = ty.TypeVar("T")
-
-TIMESTEP = CONST["SECONDS_PER_DAY"] * SIM["days_per_timestep"]
-SOLAR_MASS = CONST["SOLAR_MASS"]
-GRAV_CONST = CONST["GRAV_CONST"]
-AU = CONST["AU"]
-LIGHTYEARS_PER_AU = 1.057e-16
-COLOR_WHITE = COLOR["white"]
-
-SCALE_PER_AU = 200.0
 SCRIPT_DIR = Path(__file__).parent
+
+SOLAR_MASS = 1.98892E+30
+GRAV_CONST = 6.67428e-11
+AU = 1.496E+11  # unit of length
+LIGHTYEARS_PER_AU = 1.057e-16
+SECONDS_PER_DAY = 86400.0  # unit of time
+
+DAYS_PER_TIMESTEP = 2.0
+TIMESTEP = SECONDS_PER_DAY * DAYS_PER_TIMESTEP
+SCALE_PER_AU = 200.0
+
+COLOR_WHITE = (255, 255, 255)
 
 KEY_TEXT = (
     "Press q to exit",
@@ -41,6 +43,8 @@ KEY_TEXT = (
     "Use - / + to zoom, and 0 to reset",
     "Use ] / [ to increase / decrease target FPS",
 )
+
+T = ty.TypeVar("T")
 
 
 class TextBox:
@@ -328,6 +332,11 @@ class GameContext(ctx.ContextDecorator):
     def __exit__(self, *_) -> ty.Literal[False]:
         pygame.quit()
         return False
+
+
+def load_conf(fileobj: io.IOBase):
+    data = tomllib.load(fileobj)
+    return data
 
 
 @click.command
