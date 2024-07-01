@@ -382,28 +382,31 @@ def main(resolution: tuple[int, int], config: ty.BinaryIO) -> None:
 
     # constants and units:
     scale = SCALE_PER_AU / AU
-    unit_speed = AU / CONST["SECONDS_PER_DAY"]
-    solar_mass = CONST["SOLAR_MASS"]
+    unit_speed = AU / SECONDS_PER_DAY
 
     # populating and sorting the bodies from the config file:
     bodies: list[Body] = []
-    for name, props in conf["bodies"].items():
-        rot_op = cmath.rect(1.0, random.uniform(0.0, math.tau))
+    for name, props in conf.pop("bodies").items():
+        if (angle_str := props.pop("angle", None)) is not None:
+            angle_frac = Fraction(angle_str)
+        else:
+            angle_frac = 2.0 * random.random()
+        rot_op = cmath.rect(1.0, angle_frac * math.pi)
         body = Body(
             name=name,
-            mass=props["mass"] * solar_mass,
-            pos=rot_op * complex(-props["distance"] * AU, 0.0),
-            vel=rot_op * complex(0.0, props["speed"] * unit_speed),
-            radius=props["radius"] * AU * scale,
-            color=COLOR[name],
+            mass=props.pop("mass") * SOLAR_MASS,
+            pos=rot_op * complex(-props.pop("distance") * AU, 0.0),
+            vel=rot_op * complex(0.0, props.pop("speed") * unit_speed),
+            radius=props.pop("radius") * AU * scale,
+            color=props.pop("color"),
         )
         bodies.append(body)
-    bodies.sort(key=lambda b: abs(b.pos))
-    sun = bodies[0]
-    if sun is not next(filter(lambda b: b.name.lower() == "sun", bodies)):
-        raise ValueError("Sun is not at the origin.")
+    bodies.sort(key=lambda body: abs(body.pos))
+    sun = next(b for b in bodies if b.name.lower() == "sun")
+    # if bodies[0] is not sun:
+    #     raise ValueError("Sun is not at the origin.")
 
-    loop = game_loop(window, scale, bodies, fps=100)
+    loop = game_loop(window, scale, bodies, conf.pop("bgcolor"), fps=100)
     for pause, show, draw_l, scale, half_res, shift in loop:
         for body in bodies:
             draw_(body, sun, scale, shift, half_res, show, draw_l)
