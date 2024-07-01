@@ -5,6 +5,25 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools_scm]
 write_to = "solar/_version.py"
 
+[project]
+name = "solar"
+dynamic = ["version"]
+authors = [{name = "Jacan Chaplais"}]
+maintainers = [{name = "Jacan Chaplais"}]
+description = "Solar system simulation with PyGame."
+readme = {file = "README.rst", content-type = "text/x-rst"}
+requires-python = ">=3.11"
+license = {file = "LICENSE.txt"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent"
+]
+dependencies = [
+    "pygame",
+    "click",
+]
+
 [tool.black]
 line-length = 79
 target-version = ['py311']
