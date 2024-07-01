@@ -231,10 +231,10 @@ def game_loop(
     window: pygame.Surface,
     scale: float,
     bodies: ty.Sequence[Body],
+    bg_color: tuple[int, int, int],
     fps: int = 60,
 ) -> GameLoop:
     clock = pygame.time.Clock()
-    color_universe = COLOR["universe"]
     scale_factors = {pygame.K_EQUALS: 1.25, pygame.K_MINUS: 0.75}
     rate_factors = {pygame.K_RIGHTBRACKET: 1.25, pygame.K_LEFTBRACKET: 0.75}
 
