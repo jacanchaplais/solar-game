@@ -54,7 +54,10 @@ class TextBox:
         self.toggled = False
         self.font = font
         self.color = color
-        self._box = pygame.Rect(100, 100, 140, 32)
+        self._box = pygame.Rect(100, 10, 140, 32)
+
+    def __del__(self) -> None:
+        self._buffer.close()
 
     def _toggle_active(self) -> None:
         self.active = not self.active
