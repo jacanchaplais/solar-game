@@ -232,7 +232,8 @@ def game_loop(
     scale: float,
     bodies: ty.Sequence[Body],
     bg_color: tuple[int, int, int],
-    fps: int = 60,
+    fps: int,
+    fps_throttle: int,
 ) -> GameLoop:
     clock = pygame.time.Clock()
     scale_factors = {pygame.K_EQUALS: 1.25, pygame.K_MINUS: 0.75}
@@ -297,7 +298,7 @@ def game_loop(
             for body in bodies:
                 body.update_scale(factor)
         if fps_factor:
-            fps = min(max(10, math.ceil(fps_factor * fps)), 300)
+            fps = min(max(10, math.ceil(fps_factor * fps)), fps_throttle)
         elif rescale:
             factor = SCALE_PER_AU / (scale * AU)
             scale *= factor
@@ -364,15 +365,24 @@ def load_conf(fileobj: io.IOBase):
     nargs=2,
     type=click.IntRange(min=360),
     default=(1280, 720),
+    show_default=True,
 )
 @click.option(
     "-c",
     "--config",
     type=click.File(mode="rb"),
     default=None,
+    show_default=True,
+)
+@click.option(
+    "-t",
+    "--throttle",
+    type=click.IntRange(min=1),
+    default=300,
+    show_default=True,
 )
 @GameContext("Solar System Simulation")
-def main(resolution: tuple[int, int], config: ty.BinaryIO) -> None:
+def main(resolution: tuple[int, int], config: ty.BinaryIO, throttle: int) -> None:
     conf = load_conf(config)
 
     # pygame program variables:
@@ -406,7 +416,14 @@ def main(resolution: tuple[int, int], config: ty.BinaryIO) -> None:
     # if bodies[0] is not sun:
     #     raise ValueError("Sun is not at the origin.")
 
-    loop = game_loop(window, scale, bodies, conf.pop("bgcolor"), fps=100)
+    loop = game_loop(
+        window,
+        scale,
+        bodies,
+        conf.pop("bgcolor"),
+        fps=100,
+        fps_throttle=throttle
+    )
     for pause, show, draw_l, scale, half_res, shift in loop:
         for body in bodies:
             draw_(body, sun, scale, shift, half_res, show, draw_l)
