@@ -1,0 +1,8 @@
+name: solar
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pygame
+  - click
+  - ipython
